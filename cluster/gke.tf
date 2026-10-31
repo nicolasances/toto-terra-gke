@@ -36,7 +36,7 @@ resource "google_container_cluster" "gke-cluster" {
         enable_private_endpoint = false
     }
 
-    cluster_auto_scaling {
+    cluster_autoscaling {
         auto_provisioning_defaults {
             service_account = google_service_account.gke-nodes.email
             oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
