@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------
-# 1. GCP Project Variables
+# 1. GCP Project Variables (project hosting the GKE cluster)
 # ---------------------------------------------------------------
 variable "gcp_pid" {
   description = "GCP Project ID"
