@@ -9,15 +9,15 @@ terraform {
             version = "2.38.0"
         }
     }
-    # backend "gcs" {
-    #     bucket = "<terraform-state-bucket>"
-    #     prefix = "terraform/state"
-    # }
+    backend "gcs" {
+        bucket = "toto-terra-gke-dr"
+        prefix = "terraform/state"
+    }
 }
 
+# Credentials come from the environment (Application Default Credentials):
+# on the Terraform VM, that is the VM's attached service account
 provider "google" {
-    credentials = var.gcp_service_account_key
-
     project = var.gcp_pid
     region = var.gcp_region
     zone = var.gcp_zone
