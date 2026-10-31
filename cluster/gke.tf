@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------
 # Dedicated, minimal identity for the nodes (instead of the default Compute Engine SA, which often has Editor).
 # Pods do NOT use it: they use Workload Identity (see workloads/).
+#
+# Its project role is granted MANUALLY (once), so that the Terraform VM does not need IAM admin rights on the project:
+#   gcloud projects add-iam-policy-binding <gcp_pid> \
+#     --member="serviceAccount:gke-nodes@<gcp_pid>.iam.gserviceaccount.com" \
+#     --role="roles/container.defaultNodeServiceAccount"
 resource "google_service_account" "gke-nodes" {
     account_id = "gke-nodes"
     display_name = "GKE Nodes Service Account"
-}
-resource "google_project_iam_member" "gke-nodes-role-default-node" {
-    project = var.gcp_pid
-    role = "roles/container.defaultNodeServiceAccount"
-    member = format("serviceAccount:%s", google_service_account.gke-nodes.email)
 }
 
 # ---------------------------------------------------------------
@@ -52,7 +52,6 @@ resource "google_container_cluster" "gke-cluster" {
 
     depends_on = [
         google_project_service.container-api,
-        google_project_iam_member.gke-nodes-role-default-node,
         google_compute_router_nat.gke-nat,
     ]
 }
