@@ -1,6 +1,6 @@
 # Architecture
 
-Diagram: [diagrams/architecture.drawio](diagrams/architecture.drawio)
+![Architecture](diagrams/architecture.drawio.svg)
 
 Everything below lives in one GCP project, `<gke-project>`, in region `europe-west1`. The exceptions are the secrets and images, which stay in `<dev-project>` and `<prod-project>`, managed by `toto-terra`.
 
@@ -28,17 +28,7 @@ Everything below lives in one GCP project, `<gke-project>`, in region `europe-we
 
 All services and environments share **one** load balancer.
 
-```
-<domain> (registrar) ──NS "dr"──▶ Cloud DNS zone dr.<domain>
-                                     ├─ A api.dev.dr.<domain> ─┐
-                                     └─ A api.dr.<domain> ─────┴─▶ static IP gke-gateway-ip
-                                                                    │
-                                     Global external Application LB (Gateway public-gateway)
-                                       :80  → 301 to https
-                                       :443 → TLS (cert map gke-gateway-certmap)
-                                              ├─ host api.dev.dr.<domain> + /tomelang → dev/tome-ms-language
-                                              └─ host api.dr.<domain>     + /tomelang → prod/tome-ms-language
-```
+![Public entry point](diagrams/public-entry.drawio.svg)
 
 - **DNS.** The parent domain stays at the registrar. Only the subdomain `dr.<domain>` is delegated to Cloud DNS, through 4 NS records named `dr` at the registrar (`terraform output domain_name_servers`). The delegation can later move to another GCP project without touching the parent domain.
 - **Certificate.** A Google-managed certificate covering both hostnames, validated by DNS authorization: Terraform writes the validation CNAME records into the Cloud DNS zone. A certificate map lets the Gateway pick it per hostname.
@@ -71,4 +61,4 @@ The `totoms` SDK reads its secrets from `projects/$GCP_PID/secrets/<name>` at st
 
 ## 6. Who runs Terraform
 
-A GCP VM (`terra`) with Application Default Credentials from its service account, so no key file is involved. The VM needs the `cloud-platform` access scope; the actual permissions are restricted by IAM on that service account. The state and its lock live in the GCS bucket `toto-terra-gke-dr`. See [diagrams/terraform-layout.drawio](diagrams/terraform-layout.drawio) and [operations.md](operations.md).
+A GCP VM (`terra`) with Application Default Credentials from its service account, so no key file is involved. The VM needs the `cloud-platform` access scope; the actual permissions are restricted by IAM on that service account. The state and its lock live in the GCS bucket `toto-terra-gke-dr`. See [diagrams/terraform-layout.drawio.svg](diagrams/terraform-layout.drawio.svg) and [operations.md](operations.md).

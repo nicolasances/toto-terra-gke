@@ -26,9 +26,9 @@ For example, `https://api.dev.dr.<domain>/tomelang/...` reaches `tome-ms-languag
 
 ## Architecture
 
-Diagram: [docs/diagrams/architecture.drawio](docs/diagrams/architecture.drawio)
+![Architecture](docs/diagrams/architecture.drawio.svg)
 
-> The diagrams are draw.io files in [`docs/diagrams/`](docs/diagrams). Open them with [app.diagrams.net](https://app.diagrams.net) or the draw.io extension for VS Code.
+> The diagrams are draw.io files saved as `.drawio.svg` in [`docs/diagrams/`](docs/diagrams): GitHub shows them as images, and [draw.io](https://app.diagrams.net) or the draw.io extension for VS Code opens them for editing.
 
 How a request flows:
 
@@ -49,6 +49,8 @@ The two repos split responsibilities:
 | GCP project | `<gke-project>` |  |
 | Owns | Network, cluster, DNS, certificates, Gateway, Kubernetes objects | Secrets, Artifact Registry, databases, Pub/Sub, buckets, ... |
 | Identity | Creates the Kubernetes service account `<env>/<service>` | Grants IAM roles to that service account's principal |
+
+![Terraform layout](docs/diagrams/terraform-layout.drawio.svg)
 
 The link between them is the pod's **Workload Identity principal**:
 

@@ -1,6 +1,6 @@
 # Operations
 
-Diagram: [diagrams/terraform-layout.drawio](diagrams/terraform-layout.drawio)
+![Terraform layout](diagrams/terraform-layout.drawio.svg)
 
 ## First setup (in order)
 

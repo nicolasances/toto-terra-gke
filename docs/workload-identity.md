@@ -1,6 +1,6 @@
 # Workload Identity: access from GKE to the toto projects
 
-Diagram: [diagrams/workload-identity.drawio](diagrams/workload-identity.drawio)
+![Workload Identity](diagrams/workload-identity.drawio.svg)
 
 ## The problem
 
@@ -12,11 +12,10 @@ A Workload Identity pool is a set of identities that Google IAM trusts even thou
 
 - it is named `<gke-project>.svc.id.goog` (`terraform output gke_workload_pool`), and exists automatically. Autopilot always enables it.
 - it trusts tokens signed by the clusters of `<gke-project>`
-- every Kubernetes service account becomes a principal in it:
+- every Kubernetes service account becomes a principal in it. The principal names the project that owns the pool (by number), the pool, and the namespace and service account inside it:
 
 ```
 principal://iam.googleapis.com/projects/<gke-project-number>/locations/global/workloadIdentityPools/<gke-project>.svc.id.goog/subject/ns/<namespace>/sa/<ksa>
-                                         └ project that owns the pool ┘                           └ the pool ─────────────┘ └ who, inside it ─┘
 ```
 
 ## What happens at runtime
