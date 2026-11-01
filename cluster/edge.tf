@@ -4,11 +4,15 @@
 # created in workloads/ and uses what is defined here.
 # ---------------------------------------------------------------
 locals {
+    # Subdomain owned by this project: the parent zone (<domain>, at the registrar or in another
+    # GCP project) delegates it here with NS records, so it can move without touching this repo
+    subdomain = format("dr.%s", var.domain)
+
     # Public hostname of each environment. Services are routed by path (their basePath) on it,
-    # e.g. https://api.dev.<domain>/tomelang/...
+    # e.g. https://api.dev.dr.<domain>/tomelang/...
     env_hostnames = {
-        dev = format("api.dev.dr.%s", var.domain)
-        prod = format("api.dr.%s", var.domain)
+        dev = format("api.dev.%s", local.subdomain)
+        prod = format("api.%s", local.subdomain)
     }
 }
 
@@ -21,12 +25,13 @@ resource "google_compute_global_address" "gateway-ip" {
 }
 
 # ---------------------------------------------------------------
-# 2. DNS zone of the domain
+# 2. DNS zone of the subdomain
 # ---------------------------------------------------------------
-# The registrar must point the domain's nameservers to this zone's name_servers (see outputs)
+# The parent zone must delegate the subdomain with 4 NS records "dr" -> this zone's name_servers (see outputs).
+# Do NOT change the domain's nameservers at the registrar: that would hand over the whole domain.
 resource "google_dns_managed_zone" "domain-zone" {
-    name = format("%s-zone", replace(var.domain, ".", "-"))
-    dns_name = format("%s.", var.domain)
+    name = format("%s-zone", replace(local.subdomain, ".", "-"))
+    dns_name = format("%s.", local.subdomain)
     depends_on = [google_project_service.dns-api]
 }
 resource "google_dns_record_set" "env-hostname" {

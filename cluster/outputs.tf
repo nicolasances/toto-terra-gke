@@ -10,7 +10,7 @@ output "gke_nat_ip" {
     value = google_compute_address.gke-nat-ip.address
 }
 
-# Nameservers to configure at the domain registrar
+# Values of the 4 NS records "dr" to create in the parent zone (registrar today)
 output "domain_name_servers" {
     value = google_dns_managed_zone.domain-zone.name_servers
 }
