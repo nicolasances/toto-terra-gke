@@ -7,5 +7,8 @@ export TF_VAR_gcp_pid="<gke-project-id>"
 export TF_VAR_gke_cluster_name="<cluster-name>"
 export TF_VAR_gke_cluster_location="europe-west1"
 
+# Public domain (bought at a registrar, DNS delegated to Cloud DNS by cluster/)
+export TF_VAR_domain="<your-domain.com>"
+
 # Image tag (package.json version) of tome-ms-language deployed in each environment
 export TF_VAR_tome_ms_language_image_tag='{"dev":"1.0.0","prod":"1.0.0"}'

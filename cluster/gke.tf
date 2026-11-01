@@ -47,6 +47,11 @@ resource "google_container_cluster" "gke-cluster" {
         channel = "REGULAR"
     }
 
+    # Installs the Gateway API CRDs and the GKE Gateway controller (used by workloads/ to expose services)
+    gateway_api_config {
+        channel = "CHANNEL_STANDARD"
+    }
+
     # Terraform refuses to destroy (or replace) the cluster while this is true
     deletion_protection = true
 

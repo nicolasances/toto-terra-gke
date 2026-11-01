@@ -29,5 +29,13 @@ resource "google_project_service" "container-api" {
     service = "container.googleapis.com"
     disable_on_destroy = false
 }
+resource "google_project_service" "dns-api" {
+    service = "dns.googleapis.com"
+    disable_on_destroy = false
+}
+resource "google_project_service" "certificatemanager-api" {
+    service = "certificatemanager.googleapis.com"
+    disable_on_destroy = false
+}
 
 data "google_project" "current" {}

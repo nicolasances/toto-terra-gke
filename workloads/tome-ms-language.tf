@@ -131,3 +131,77 @@ resource "kubernetes_service_v1" "tome-ms-language-service" {
         }
     }
 }
+
+# ---------------------------------------------------------------
+# 5. Public exposure through the shared Gateway
+#    https://<environment hostname>/tomelang/... -> this service
+# ---------------------------------------------------------------
+resource "kubernetes_manifest" "tome-ms-language-route" {
+    for_each = local.environments
+
+    manifest = {
+        apiVersion = "gateway.networking.k8s.io/v1"
+        kind = "HTTPRoute"
+        metadata = {
+            name = "tome-ms-language"
+            namespace = kubernetes_namespace_v1.env-namespace[each.key].metadata[0].name
+        }
+        spec = {
+            parentRefs = [
+                {
+                    name = local.gateway_name
+                    namespace = kubernetes_namespace_v1.gateway-namespace.metadata[0].name
+                    sectionName = "https"
+                },
+            ]
+            hostnames = [data.terraform_remote_state.cluster.outputs.env_hostnames[each.key]]
+            rules = [
+                {
+                    matches = [
+                        {
+                            path = {
+                                type = "PathPrefix"
+                                value = "/tomelang"
+                            }
+                        },
+                    ]
+                    backendRefs = [
+                        {
+                            name = kubernetes_service_v1.tome-ms-language-service[each.key].metadata[0].name
+                            port = 80
+                        },
+                    ]
+                },
+            ]
+        }
+    }
+}
+
+# The load balancer health-checks "/" by default, which the service does not serve: point it to /health
+resource "kubernetes_manifest" "tome-ms-language-healthcheck" {
+    for_each = local.environments
+
+    manifest = {
+        apiVersion = "networking.gke.io/v1"
+        kind = "HealthCheckPolicy"
+        metadata = {
+            name = "tome-ms-language"
+            namespace = kubernetes_namespace_v1.env-namespace[each.key].metadata[0].name
+        }
+        spec = {
+            default = {
+                config = {
+                    type = "HTTP"
+                    httpHealthCheck = {
+                        requestPath = "/health"
+                    }
+                }
+            }
+            targetRef = {
+                group = ""
+                kind = "Service"
+                name = kubernetes_service_v1.tome-ms-language-service[each.key].metadata[0].name
+            }
+        }
+    }
+}

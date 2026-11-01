@@ -40,3 +40,14 @@ provider "kubernetes" {
     token = data.google_client_config.current.access_token
     cluster_ca_certificate = base64decode(data.google_container_cluster.gke-cluster.master_auth[0].cluster_ca_certificate)
 }
+
+# ---------------------------------------------------------------
+# Outputs of cluster/ (Gateway IP, certificate map, hostnames per environment)
+# ---------------------------------------------------------------
+data "terraform_remote_state" "cluster" {
+    backend = "gcs"
+    config = {
+        bucket = "toto-terra-gke-dr"
+        prefix = "terraform/cluster"
+    }
+}
