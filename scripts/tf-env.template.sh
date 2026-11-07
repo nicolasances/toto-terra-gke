@@ -11,4 +11,4 @@ export TF_VAR_gke_cluster_location="europe-west1"
 export TF_VAR_domain="<your-domain.com>"
 
 # Image tag (package.json version) of tome-ms-language deployed in each environment
-export TF_VAR_tome_ms_language_image_tag='{"dev":"1.0.1","prod":"1.0.1"}'
+export TF_VAR_tome_ms_language_image_tag='{"dev":"1.0.2","prod":"1.0.2"}'
