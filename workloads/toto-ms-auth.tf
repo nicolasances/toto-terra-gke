@@ -107,6 +107,20 @@ resource "kubernetes_deployment_v1" "toto-ms-auth-deployment" {
             }
         }
     }
+
+    # Autopilot mutates the Deployment at admission (warden): it adds annotations, default
+    # ephemeral-storage, security contexts and an arch toleration. Don't try to revert them.
+    lifecycle {
+        ignore_changes = [
+            metadata[0].annotations["autopilot.gke.io/resource-adjustment"],
+            metadata[0].annotations["autopilot.gke.io/warden-version"],
+            spec[0].template[0].spec[0].container[0].resources[0].limits["ephemeral-storage"],
+            spec[0].template[0].spec[0].container[0].resources[0].requests["ephemeral-storage"],
+            spec[0].template[0].spec[0].container[0].security_context,
+            spec[0].template[0].spec[0].security_context,
+            spec[0].template[0].spec[0].toleration,
+        ]
+    }
 }
 
 # ---------------------------------------------------------------
@@ -129,6 +143,14 @@ resource "kubernetes_service_v1" "toto-ms-auth-service" {
             port = 80
             target_port = "http"
         }
+    }
+
+    # The GKE NEG controller (used by the Gateway) annotates the Service. Don't try to revert it.
+    lifecycle {
+        ignore_changes = [
+            metadata[0].annotations["cloud.google.com/neg"],
+            metadata[0].annotations["cloud.google.com/neg-status"],
+        ]
     }
 }
 
