@@ -39,6 +39,13 @@ provider "kubernetes" {
     host = format("https://%s", data.google_container_cluster.gke-cluster.endpoint)
     token = data.google_client_config.current.access_token
     cluster_ca_certificate = base64decode(data.google_container_cluster.gke-cluster.master_auth[0].cluster_ca_certificate)
+
+    # Annotations managed by GKE (Autopilot, NEG controller for the Gateway), not by Terraform:
+    # without this, every plan would try to remove them
+    ignore_annotations = [
+        "^autopilot\\.gke\\.io\\/.*",
+        "^cloud\\.google\\.com\\/neg(-status)?$",
+    ]
 }
 
 # ---------------------------------------------------------------
