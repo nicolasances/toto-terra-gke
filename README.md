@@ -5,7 +5,7 @@ Terraform that hosts Toto microservices on **Google Kubernetes Engine (GKE)**.
 The Toto microservices (built on the [`totoms`](https://github.com/nicolasances/toto-microservice-sdk) SDK) normally live in two GCP projects managed by [`toto-terra`](https://github.com/nicolasances/toto-terra):
 `<dev-project>` (dev) and `<prod-project>` (prod). This repo runs them instead on **one GKE cluster in a separate GCP project**, while they keep reading their secrets and pulling their images from those two projects.
 
-Today it hosts `tome-ms-language` and `toto-ms-auth`. Other services can be added the same way.
+Today it hosts `tome-ms-language`, `toto-ms-auth` and `toto-ms-supermarket`. Other services can be added the same way.
 
 > Placeholders used in the docs: `<gke-project>` is the project hosting the cluster, `<dev-project>` and `<prod-project>` are the toto projects of each environment (see `local.environments` in `workloads/gke.tf`), and `<domain>` is the public domain.
 

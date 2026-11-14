@@ -15,3 +15,10 @@ export TF_VAR_tome_ms_language_image_tag='{"dev":"1.1.0","prod":"1.1.0"}'
 
 # Image tag (package.json version) of toto-ms-auth deployed in each environment
 export TF_VAR_toto_ms_auth_image_tag='{"dev":"2.0.0","prod":"2.0.0"}'
+
+
+# Image tag (package.json version) of toto-ms-supermarket deployed in each environment
+export TF_VAR_toto_ms_supermarket_image_tag='{"dev":"<version>","prod":"<version>"}'
+
+# URL of the Gale broker (still on Cloud Run) used by toto-ms-supermarket, per environment
+export TF_VAR_toto_ms_supermarket_gale_broker_url='{"dev":"https://gale-broker-<cloud_run_endpoint_suffix>/galebroker","prod":"https://gale-broker-<cloud_run_endpoint_suffix>/galebroker"}'
