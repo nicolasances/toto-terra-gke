@@ -27,3 +27,6 @@ output "gateway_certmap_name" {
 output "env_hostnames" {
     value = local.env_hostnames
 }
+output "suppie_hostnames" {
+    value = local.suppie_hostnames
+}

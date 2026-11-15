@@ -84,3 +84,57 @@ resource "google_certificate_manager_certificate_map_entry" "env-hostname" {
     hostname = each.value
     certificates = [google_certificate_manager_certificate.gateway-cert.id]
 }
+
+# ---------------------------------------------------------------
+# 4. Web apps hosted on their own hostname (served on "/", not on a path of the api hostname)
+# ---------------------------------------------------------------
+locals {
+    # toto-suppie (workloads/toto-react-supermarket.tf)
+    suppie_hostnames = {
+        dev = format("suppie.dev.%s", local.subdomain)
+        prod = format("suppie.%s", local.subdomain)
+    }
+}
+resource "google_dns_record_set" "suppie-hostname" {
+    for_each = local.suppie_hostnames
+
+    managed_zone = google_dns_managed_zone.domain-zone.name
+    name = format("%s.", each.value)
+    type = "A"
+    ttl = 300
+    rrdatas = [google_compute_global_address.gateway-ip.address]
+}
+resource "google_certificate_manager_dns_authorization" "suppie-hostname" {
+    for_each = local.suppie_hostnames
+
+    name = format("%s-suppie-hostname-dns-auth", each.key)
+    domain = each.value
+    depends_on = [google_project_service.certificatemanager-api]
+}
+resource "google_dns_record_set" "suppie-hostname-dns-auth" {
+    for_each = local.suppie_hostnames
+
+    managed_zone = google_dns_managed_zone.domain-zone.name
+    name = google_certificate_manager_dns_authorization.suppie-hostname[each.key].dns_resource_record[0].name
+    type = google_certificate_manager_dns_authorization.suppie-hostname[each.key].dns_resource_record[0].type
+    ttl = 300
+    rrdatas = [google_certificate_manager_dns_authorization.suppie-hostname[each.key].dns_resource_record[0].data]
+}
+# Separate certificate on purpose: changing the domains of gateway-cert would replace it,
+# and the api hostnames would lose HTTPS until the new one is ACTIVE
+resource "google_certificate_manager_certificate" "suppie-cert" {
+    name = "gke-suppie-cert"
+    managed {
+        domains = values(local.suppie_hostnames)
+        dns_authorizations = [for auth in google_certificate_manager_dns_authorization.suppie-hostname : auth.id]
+    }
+}
+# The Gateway's https listener has no hostname filter: the cert map picks this certificate by SNI
+resource "google_certificate_manager_certificate_map_entry" "suppie-hostname" {
+    for_each = local.suppie_hostnames
+
+    name = format("%s-suppie-hostname", each.key)
+    map = google_certificate_manager_certificate_map.gateway-certmap.name
+    hostname = each.value
+    certificates = [google_certificate_manager_certificate.suppie-cert.id]
+}
