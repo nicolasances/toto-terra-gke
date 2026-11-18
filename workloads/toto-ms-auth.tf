@@ -33,7 +33,7 @@ resource "kubernetes_config_map_v1" "toto-ms-auth-config" {
 # 3. Deployment
 # ---------------------------------------------------------------
 variable "toto_ms_auth_image_tag" {
-    description = "Image tag (package.json version) of toto-ms-auth to deploy, per environment (keys: dev, prod)"
+    description = "Image tag (package.json version) of toto-ms-auth to deploy, per environment (keys: dev, prod). Only used when the Deployment is created: after that CI owns the image and changing this has no effect"
     type = map(string)
 }
 resource "kubernetes_deployment_v1" "toto-ms-auth-deployment" {
@@ -119,6 +119,9 @@ resource "kubernetes_deployment_v1" "toto-ms-auth-deployment" {
             spec[0].template[0].spec[0].container[0].security_context,
             spec[0].template[0].spec[0].security_context,
             spec[0].template[0].spec[0].toleration,
+            # CI (GitHub Actions in the service repo) owns the image after creation:
+            # it runs `kubectl set image`. Terraform only sets it when it creates the Deployment.
+            spec[0].template[0].spec[0].container[0].image,
         ]
     }
 }
