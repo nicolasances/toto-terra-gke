@@ -40,11 +40,25 @@ cd workloads && terraform init && terraform apply
 
 ## Deploy a new version of a service
 
-1. Make sure the image `<version>` exists in the environment's Artifact Registry.
-2. Update the tag in your env file, e.g. `TF_VAR_tome_ms_language_image_tag='{"dev":"1.3.0","prod":"1.2.0"}'`, then `source` it.
-3. `cd workloads && terraform apply`. Only the Deployment of the changed environment should be updated.
+Deploys happen through **CI in the service repo** (GitHub Actions), not through Terraform:
 
-Caution: the Artifact Registry cleanup policy in `toto-terra` deletes images older than 7 days. A pinned tag that gets deleted breaks the next pod restart. Raise `keep_count` there, or exclude released tags.
+- push on `feature/**` (and `issue/**` where the repo uses it) → builds the image and deploys it to namespace `dev`
+- push on `main` → builds the image and deploys it to namespace `prod`
+
+The workflow runs `kubectl set image -n <env> deploy/<service> <service>=<image>:<tag>` and then `kubectl rollout status`. Terraform ignores the Deployment's image (`lifecycle.ignore_changes`), so the next `terraform apply` doesn't revert it.
+
+The `TF_VAR_<service>_image_tag` variables are only used when Terraform **creates** a Deployment (first apply, new environment, recreation of the Deployment). Changing them afterwards has no effect.
+
+### Roll back
+
+Either:
+
+- roll back to the previous ReplicaSet: `kubectl rollout undo -n <env> deploy/<service>` (list revisions with `kubectl rollout history -n <env> deploy/<service>`), or
+- rerun the CI job of an older commit in the service repo.
+
+A rollback is overwritten by the next CI deploy of that environment.
+
+Caution: the Artifact Registry cleanup policy in `toto-terra` deletes old images. Rolling back, or recreating a Deployment from a pinned tag, fails if the image has been deleted.
 
 ## Add a new service
 

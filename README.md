@@ -89,6 +89,8 @@ cd ../workloads && terraform init && terraform apply   # 2. workloads (after tot
 
 The first setup needs a few steps outside this repo: the state bucket, IAM grants, NS records at the registrar, and `toto-terra`. The full order is in [docs/operations.md](docs/operations.md).
 
+The `TF_VAR_<service>_image_tag` variables are only used when a Deployment is created (first apply, new environment, recreation). After that, **deploys happen through CI** in each service repo (`kubectl set image`), and Terraform ignores the image: changing these variables has no effect on a running Deployment.
+
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md): every component, and why it is there
