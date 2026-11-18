@@ -50,8 +50,13 @@ Why a Gateway rather than a `LoadBalancer` Service per service: one IP, one cert
 | Deployment `<service>` | service × env | Image `europe-west1-docker.pkg.dev/<env project>/<service>/<service>:<tag>`, probes on `/health`, requests and limits |
 | Service `<service>` | service × env | ClusterIP, port 80 → container port `http` (8080) |
 | HTTPRoute + HealthCheckPolicy | service × env | See above |
+| Role + RoleBinding `ci-deployer` | env | Lets `toto-cicd@<env project>` (the CI service account of the service repos) update Deployments in that namespace only |
 
-The **image tag** comes from `TF_VAR_tome_ms_language_image_tag`, for example `{"dev":"1.2.0","prod":"1.1.0"}`. Deploying is a Terraform apply.
+**Who owns what.** Terraform owns the shape of each workload (KSA, ConfigMap, Deployment skeleton, Service, HTTPRoute, HealthCheckPolicy). **CI owns which image runs**: GitHub Actions in each service repo builds the image and runs `kubectl set image` + `kubectl rollout status` (feature branches → `dev`, `main` → `prod`). The Deployment's image is in `lifecycle.ignore_changes`, so a `terraform apply` doesn't revert it.
+
+The **image tag** variables (`TF_VAR_<service>_image_tag`, for example `{"dev":"1.2.0","prod":"1.1.0"}`) only set the image when Terraform creates the Deployment (first apply, new environment, recreation).
+
+CI authenticates with the existing `toto-cicd` Google service account of each toto project. It needs `roles/container.clusterViewer` on `<gke-project>` to fetch credentials (granted by hand, see [operations.md](operations.md)) and gets its Kubernetes rights only from the `ci-deployer` Role.
 
 **Images** are pulled from the environment's Artifact Registry repository, which `toto-terra` makes publicly readable. That is why the nodes need no registry permission.
 

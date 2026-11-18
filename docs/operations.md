@@ -28,6 +28,17 @@ gcloud projects add-iam-policy-binding <gke-project> \
 
 Also give the VM's service account `roles/iam.serviceAccountUser` on `gke-nodes`, so it can create a cluster whose nodes run as it.
 
+Let the CI service accounts of the service repos fetch cluster credentials (`get-gke-credentials` / `gcloud container clusters get-credentials`). `roles/container.clusterViewer` only grants `container.clusters.get`/`list`: it gives no rights inside the cluster. Those come from the `ci-deployer` Role in `workloads/` (see "Deploy a new version of a service").
+
+```bash
+gcloud projects add-iam-policy-binding <gke-project> \
+  --member="serviceAccount:toto-cicd@<dev-project>.iam.gserviceaccount.com" \
+  --role="roles/container.clusterViewer"
+gcloud projects add-iam-policy-binding <gke-project> \
+  --member="serviceAccount:toto-cicd@<prod-project>.iam.gserviceaccount.com" \
+  --role="roles/container.clusterViewer"
+```
+
 **2. Registrar.** Create 4 NS records named `dr` with the values of `terraform output domain_name_servers`. Do **not** change the domain's own nameservers. Until the delegation has propagated, the certificate stays `PROVISIONING`.
 
 **3. toto-terra.** Set `gke_project_id` and `gke_project_number` (`terraform output gke_project_number`), then apply on `<dev-project>` and on `<prod-project>`. This grants the pods access to their secrets.
@@ -58,6 +69,22 @@ Either:
 
 A rollback is overwritten by the next CI deploy of that environment.
 
+### CI access to the cluster
+
+CI authenticates with the `toto-cicd` service account of the environment's toto project (GitHub environment secret `CICD_SERVICE_ACCOUNT`, managed by `toto-terra`). Two pieces give it access:
+
+- **GCP IAM** (manual, see first setup): `roles/container.clusterViewer` on `<gke-project>`, to fetch the cluster credentials.
+- **Kubernetes RBAC** (`workloads/ci-deployer.tf`): a Role `ci-deployer` in each environment namespace (`deployments`: get/list/watch/patch; `replicasets` and `pods`: get/list/watch), bound to the user `toto-cicd@<env project>.iam.gserviceaccount.com`. The dev SA can only deploy to `dev`, the prod SA only to `prod`.
+
+Check it (as a cluster admin):
+
+```bash
+kubectl auth can-i patch deployments -n dev  --as=toto-cicd@<dev-project>.iam.gserviceaccount.com   # yes
+kubectl auth can-i patch deployments -n prod --as=toto-cicd@<dev-project>.iam.gserviceaccount.com   # no
+kubectl auth can-i patch deployments -n prod --as=toto-cicd@<prod-project>.iam.gserviceaccount.com  # yes
+kubectl auth can-i patch deployments -n dev  --as=toto-cicd@<prod-project>.iam.gserviceaccount.com  # no
+```
+
 Caution: the Artifact Registry cleanup policy in `toto-terra` deletes old images. Rolling back, or recreating a Deployment from a pinned tag, fails if the image has been deleted.
 
 ## Add a new service
@@ -66,9 +93,10 @@ Caution: the Artifact Registry cleanup policy in `toto-terra` deletes old images
    - resource names, KSA, ConfigMap, Deployment, Service
    - image path and the `<service>_image_tag` variable
    - the HTTPRoute `PathPrefix`, which must be the service's base path
-   Add the tag variable to `scripts/tf-env.template.sh` and your env file.
+   Add the tag variable to `scripts/tf-env.template.sh` and your env file. It sets the image of the first deploy only.
 2. **toto-terra:** in `<service>.tf`, build the principal `ns/<env>/sa/<service>` (same pattern as `tome_ms_language_gke_principal`) and grant it the roles the service needs, at least `secretAccessor`. Apply on both projects.
 3. Apply `workloads/`.
+4. **Service repo:** add the CI workflow that builds the image and runs `kubectl set image` / `kubectl rollout status` on `deploy/<service>` (feature branches → `dev`, `main` → `prod`). Nothing to add here for CI access: the `ci-deployer` Role is per namespace and covers every Deployment in it.
 
 ## Check what runs
 
@@ -96,4 +124,7 @@ kubectl port-forward -n dev svc/tome-ms-language 8080:80
 | Certificate `PROVISIONING`, `CNAME_MISMATCH` | DNS delegation not propagated yet: check `dig NS dr.<domain>` and the `_acme-challenge` CNAME, then wait |
 | Pod crashes at startup with a permission error on secrets | `toto-terra` grant missing or wrong principal (project number, namespace, KSA name) |
 | `kubectl logs` shows nothing | Pass the namespace: `-n dev` / `-n prod` |
+| CI deploy: `deployments.apps "<service>" is forbidden` | `ci-deployer` Role/RoleBinding missing in that namespace (apply `workloads/`), or CI uses the SA of the other environment |
+| CI: 403 `container.clusters.get` when fetching credentials | Manual `roles/container.clusterViewer` grant missing for that `toto-cicd` SA (see first setup) |
+| `terraform apply` changes a Deployment's image | It shouldn't: the image is in `ignore_changes`. Check that the Deployment's `lifecycle` block still lists `container[0].image` |
 | 502 / no healthy upstream from the Gateway | Health check failing: check the HealthCheckPolicy and that `/health` answers on the container port |

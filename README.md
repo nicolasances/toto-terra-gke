@@ -13,6 +13,7 @@ Today it hosts `tome-ms-language`, `toto-ms-auth` and `toto-ms-supermarket` (on 
 
 - **Creates the platform** (`cluster/`): a dedicated VPC, a GKE Autopilot cluster with private nodes, Cloud NAT for outbound traffic, and the public entry point (static IP, Cloud DNS zone, Google-managed TLS certificate).
 - **Deploys the workloads** (`workloads/`): one namespace per environment (`dev`, `prod`), a shared public Gateway (one HTTPS load balancer for all services), and for each service a Deployment, a Service and an HTTPRoute.
+- **Lets CI deploy** (`workloads/ci-deployer.tf`): the `toto-cicd` service account of each toto project can roll out new images in its own namespace only. Terraform owns the shape of the workloads, CI owns which image runs.
 - **Gives the pods a GCP identity** through Workload Identity. `toto-terra` grants that identity access to the secrets in `<dev-project>` and `<prod-project>`. No service account keys are involved.
 
 Services are reachable at:
@@ -95,5 +96,5 @@ The `TF_VAR_<service>_image_tag` variables are only used when a Deployment is cr
 
 - [docs/architecture.md](docs/architecture.md): every component, and why it is there
 - [docs/workload-identity.md](docs/workload-identity.md): how pods get access to the toto projects
-- [docs/operations.md](docs/operations.md): first setup, deploying a new version, adding a service, troubleshooting
+- [docs/operations.md](docs/operations.md): first setup, deploying a new version through CI, rolling back, adding a service, troubleshooting
 - [docs/diagrams/](docs/diagrams): draw.io diagrams (architecture, Workload Identity, Terraform layout)
