@@ -27,5 +27,8 @@ export TF_VAR_toto_ms_supermarket_image_tag='{"dev":"<version>","prod":"<version
 # URL of the Gale broker (still on Cloud Run) used by toto-ms-supermarket, per environment
 export TF_VAR_toto_ms_supermarket_gale_broker_url='{"dev":"https://gale-broker-<cloud_run_endpoint_suffix>/galebroker","prod":"https://gale-broker-<cloud_run_endpoint_suffix>/galebroker"}'
 
+# Image tag (package.json version) of toto-ms-expenses used when its Deployments are created
+export TF_VAR_toto_ms_expenses_image_tag='{"dev":"<version>","prod":"<version>"}'
+
 # Image tag (package.json version) of toto-react-supermarket (toto-suppie) used when its Deployments are created
 export TF_VAR_toto_react_supermarket_image_tag='{"dev":"<version>","prod":"<version>"}'
