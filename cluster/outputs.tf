@@ -30,3 +30,6 @@ output "env_hostnames" {
 output "suppie_hostnames" {
     value = local.suppie_hostnames
 }
+output "money_hostnames" {
+    value = local.money_hostnames
+}

@@ -138,3 +138,54 @@ resource "google_certificate_manager_certificate_map_entry" "suppie-hostname" {
     hostname = each.value
     certificates = [google_certificate_manager_certificate.suppie-cert.id]
 }
+
+locals {
+    # toto-reactjs-expenses (workloads/toto-reactjs-expenses.tf)
+    money_hostnames = {
+        dev = format("money.dev.%s", local.subdomain)
+        prod = format("money.%s", local.subdomain)
+    }
+}
+resource "google_dns_record_set" "money-hostname" {
+    for_each = local.money_hostnames
+
+    managed_zone = google_dns_managed_zone.domain-zone.name
+    name = format("%s.", each.value)
+    type = "A"
+    ttl = 300
+    rrdatas = [google_compute_global_address.gateway-ip.address]
+}
+resource "google_certificate_manager_dns_authorization" "money-hostname" {
+    for_each = local.money_hostnames
+
+    name = format("%s-money-hostname-dns-auth", each.key)
+    domain = each.value
+    depends_on = [google_project_service.certificatemanager-api]
+}
+resource "google_dns_record_set" "money-hostname-dns-auth" {
+    for_each = local.money_hostnames
+
+    managed_zone = google_dns_managed_zone.domain-zone.name
+    name = google_certificate_manager_dns_authorization.money-hostname[each.key].dns_resource_record[0].name
+    type = google_certificate_manager_dns_authorization.money-hostname[each.key].dns_resource_record[0].type
+    ttl = 300
+    rrdatas = [google_certificate_manager_dns_authorization.money-hostname[each.key].dns_resource_record[0].data]
+}
+# Separate certificate on purpose: changing the domains of gateway-cert would replace it,
+# and the api hostnames would lose HTTPS until the new one is ACTIVE
+resource "google_certificate_manager_certificate" "money-cert" {
+    name = "gke-money-cert"
+    managed {
+        domains = values(local.money_hostnames)
+        dns_authorizations = [for auth in google_certificate_manager_dns_authorization.money-hostname : auth.id]
+    }
+}
+# The Gateway's https listener has no hostname filter: the cert map picks this certificate by SNI
+resource "google_certificate_manager_certificate_map_entry" "money-hostname" {
+    for_each = local.money_hostnames
+
+    name = format("%s-money-hostname", each.key)
+    map = google_certificate_manager_certificate_map.gateway-certmap.name
+    hostname = each.value
+    certificates = [google_certificate_manager_certificate.money-cert.id]
+}
