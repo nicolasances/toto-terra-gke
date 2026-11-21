@@ -32,3 +32,6 @@ export TF_VAR_toto_ms_expenses_image_tag='{"dev":"<version>","prod":"<version>"}
 
 # Image tag (package.json version) of toto-react-supermarket (toto-suppie) used when its Deployments are created
 export TF_VAR_toto_react_supermarket_image_tag='{"dev":"<version>","prod":"<version>"}'
+
+# Image tag (package.json version) of toto-reactjs-expenses used when its Deployments are created
+export TF_VAR_toto_reactjs_expenses_image_tag='{"dev":"<version>","prod":"<version>"}'
