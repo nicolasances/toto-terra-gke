@@ -69,7 +69,7 @@ Agents (today `agent-coder`: one GitHub issue in, one PR out, then exit) are bat
 | KEDA (Helm chart, pinned) in namespace `keda` | `platform/` | Separate Terraform root, applied before `workloads/`: the KEDA CRDs must exist when `workloads/` is planned |
 | `roles/monitoring.viewer` on `<gke-project>` for `keda/keda-operator` | manual grant | The Pub/Sub scaler reads the backlog from Cloud Monitoring |
 | Topic `agent-coder-tasks-<env>`, pull subscription `...-sub`, DLQ topic `...-dlq` + subscription `...-dlq-sub` | `workloads/`, in `<gke-project>` | Exactly-once delivery, ack deadline 600s, 7 days retention, dead-letter after 3 delivery attempts |
-| ServiceAccount `agent-coder` in `agents-<env>` | `workloads/` | Subscriber on its own subscription only; grants in the toto projects are in `toto-terra` |
+| ServiceAccount `agent-coder` in `agents-<env>` | `workloads/` | Subscriber on its own subscription only (manual grant); grants in the toto projects are in `toto-terra` |
 | TriggerAuthentication + ScaledJob `agent-coder` | `workloads/` | `gcp-pubsub` trigger, one pod per message |
 | Role + RoleBinding `ci-deployer` | `workloads/` | `get`/`patch` on `scaledjobs`, read on `jobs`/`pods`, for `toto-cicd@<env project>` |
 

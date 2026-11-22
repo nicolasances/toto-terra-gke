@@ -14,15 +14,6 @@ locals {
             toto_project = project
         }
     }
-    agent_coder_ksa_principals = {
-        for env, e in local.agent_environments : env => format(
-            "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/agent-coder",
-            data.terraform_remote_state.cluster.outputs.gke_project_number,
-            var.gcp_pid,
-            e.namespace,
-        )
-    }
-    pubsub_service_agent = format("serviceAccount:service-%s@gcp-sa-pubsub.iam.gserviceaccount.com", data.terraform_remote_state.cluster.outputs.gke_project_number)
 }
 
 variable "agent_coder_image_tag" {
@@ -58,7 +49,7 @@ variable "agent_coder_ephemeral_storage" {
 # ---------------------------------------------------------------
 # Workload Identity (direct federation, no Google service account): the grants in the toto
 # projects (secrets, bucket) are made in toto-terra for the principal
-# ns/agents-<env>/sa/agent-coder (see locals.agent_coder_ksa_principals).
+# ns/agents-<env>/sa/agent-coder.
 resource "kubernetes_namespace_v1" "agents-namespace" {
     for_each = local.agent_environments
 
@@ -116,40 +107,13 @@ resource "google_pubsub_subscription" "agent-coder-sub" {
         dead_letter_topic = google_pubsub_topic.agent-coder-dlq[each.key].id
         max_delivery_attempts = 3
     }
-
-    # The subscriber grant on this subscription (below) can only be created after it, so it
-    # can't be a dependency here: dead-lettering works once both grants are in place
-    depends_on = [
-        google_pubsub_topic_iam_member.agent-coder-dlq-publisher,
-    ]
 }
 
-# Dead-lettering: the Pub/Sub service agent publishes to the DLQ topic and
-# acknowledges (subscribes to) the messages of the source subscription
-resource "google_pubsub_topic_iam_member" "agent-coder-dlq-publisher" {
-    for_each = local.agent_environments
-
-    topic = google_pubsub_topic.agent-coder-dlq[each.key].name
-    role = "roles/pubsub.publisher"
-    member = local.pubsub_service_agent
-}
-
-resource "google_pubsub_subscription_iam_member" "agent-coder-dlq-source-subscriber" {
-    for_each = local.agent_environments
-
-    subscription = google_pubsub_subscription.agent-coder-sub[each.key].name
-    role = "roles/pubsub.subscriber"
-    member = local.pubsub_service_agent
-}
-
-# The runner: subscriber on its own subscription only. No publisher grants (out of scope).
-resource "google_pubsub_subscription_iam_member" "agent-coder-runner-subscriber" {
-    for_each = local.agent_environments
-
-    subscription = google_pubsub_subscription.agent-coder-sub[each.key].name
-    role = "roles/pubsub.subscriber"
-    member = local.agent_coder_ksa_principals[each.key]
-}
+# The Pub/Sub IAM grants are made BY HAND, not here: the Terraform VM can't read or set IAM
+# policies on topics and subscriptions (403 pubsub.topics.getIamPolicy). See "Agents" in
+# docs/operations.md. Per environment:
+#   - Pub/Sub service agent: publisher on the DLQ topic, subscriber on the source subscription
+#   - principal ns/agents-<env>/sa/agent-coder: subscriber on its own subscription only
 
 # ---------------------------------------------------------------
 # 3. KEDA: authentication and ScaledJob
