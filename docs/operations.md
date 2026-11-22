@@ -43,7 +43,15 @@ gcloud projects add-iam-policy-binding <gke-project> \
 
 **3. toto-terra.** Set `gke_project_id` and `gke_project_number` (`terraform output gke_project_number`), then apply on `<dev-project>` and on `<prod-project>`. This grants the pods access to their secrets.
 
-**4. `workloads/`**
+**4. `platform/`** (KEDA)
+
+```bash
+cd platform && terraform init && terraform apply
+```
+
+This is a separate root because `workloads/` uses KEDA custom resources (`ScaledJob`, `TriggerAuthentication`) through `kubernetes_manifest`, which needs their CRDs to exist at **plan** time. On a fresh cluster, a single apply that installs KEDA and plans a `ScaledJob` fails. Always apply `platform/` before `workloads/`. If your VM can't create the IAM binding, grant `roles/monitoring.viewer` on `<gke-project>` by hand to `principal://iam.googleapis.com/projects/<gke-project-number>/locations/global/workloadIdentityPools/<gke-project>.svc.id.goog/subject/ns/keda/sa/keda-operator`.
+
+**5. `workloads/`**
 
 ```bash
 cd workloads && terraform init && terraform apply
@@ -87,6 +95,38 @@ kubectl auth can-i patch deployments -n dev  --as=toto-cicd@<prod-project>.iam.g
 
 Caution: the Artifact Registry cleanup policy in `toto-terra` deletes old images. Rolling back, or recreating a Deployment from a pinned tag, fails if the image has been deleted.
 
+## Agents (agent-coder on KEDA)
+
+Namespaces `agents-dev` and `agents-prod`. CI (`toto-cicd@<env project>`) needs the same manual `roles/container.clusterViewer` on `<gke-project>` as for the services (see first setup); its Kubernetes rights come from the `ci-deployer` Role of the agents namespace (`scaledjobs`: get/patch; `jobs`, `pods`: read). The deploy is a patch of the image of the ScaledJob, for example:
+
+```bash
+kubectl patch scaledjob agent-coder -n agents-dev --type=json \
+  -p='[{"op":"replace","path":"/spec/jobTargetRef/template/spec/containers/0/image","value":"<image>:<tag>"}]'
+```
+
+Only `agents-dev` is deployed by CI for now.
+
+**Publish a test message** (there are no publisher grants for pods: use your own account):
+
+```bash
+gcloud pubsub topics publish agent-coder-tasks-dev --project <gke-project> --message '{"taskId":"<id>"}'
+```
+
+`gs://<dev-project>-agents-data/coder/<id>/task.json` must exist. Then watch it run:
+
+```bash
+kubectl get scaledjob,jobs,pods -n agents-dev
+kubectl logs -n agents-dev job/<job-name>
+```
+
+**Dead-lettered messages** (3 failed deliveries) are kept in the subscription `agent-coder-tasks-<env>-dlq-sub`:
+
+```bash
+gcloud pubsub subscriptions pull agent-coder-tasks-dev-dlq-sub --project <gke-project> --limit 10      # inspect (no ack: they stay)
+```
+
+To replay one, publish its payload again on `agent-coder-tasks-<env>`.
+
 ## Add a new service
 
 1. **This repo:** copy `workloads/tome-ms-language.tf` to `workloads/<service>.tf` and rename everything:
@@ -127,4 +167,7 @@ kubectl port-forward -n dev svc/tome-ms-language 8080:80
 | CI deploy: `deployments.apps "<service>" is forbidden` | `ci-deployer` Role/RoleBinding missing in that namespace (apply `workloads/`), or CI uses the SA of the other environment |
 | CI: 403 `container.clusters.get` when fetching credentials | Manual `roles/container.clusterViewer` grant missing for that `toto-cicd` SA (see first setup) |
 | `terraform apply` changes a Deployment's image | It shouldn't: the image is in `ignore_changes`. Check that the Deployment's `lifecycle` block still lists `container[0].image` |
+| `workloads/` plan: `no matches for kind "ScaledJob"` | KEDA CRDs missing: apply `platform/` first |
+| Messages pile up, no Job starts | Check `kubectl describe scaledjob agent-coder -n agents-<env>` and the `keda-operator` logs: usually the `keda/keda-operator` grant `roles/monitoring.viewer` is missing, or the Cloud Monitoring API is not enabled |
+| `terraform apply` changes the ScaledJob's image | It shouldn't: check that `lifecycle.ignore_changes` in `workloads/agent-coder.tf` still lists the image |
 | 502 / no healthy upstream from the Gateway | Health check failing: check the HealthCheckPolicy and that `/health` answers on the container port |

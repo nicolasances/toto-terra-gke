@@ -45,6 +45,16 @@ and grants `roles/secretmanager.secretAccessor` on the project.
 
 A service that needs more than secrets (Vertex AI, Cloud Storage, Pub/Sub, ...) needs more grants to the same principal in `toto-terra`.
 
+## Principals of the agents and of KEDA
+
+| Principal (`ns/<namespace>/sa/<ksa>`) | Granted | Where |
+|---|---|---|
+| `agents-<env>/agent-coder` | `roles/pubsub.subscriber` on its own subscription `agent-coder-tasks-<env>-sub`, in `<gke-project>` | this repo, `workloads/agent-coder.tf` |
+| `agents-<env>/agent-coder` | secrets and the agents-data bucket in `<dev-project>` / `<prod-project>` | `toto-terra` ([issue 50](https://github.com/nicolasances/toto-terra/issues/50)) |
+| `keda/keda-operator` | `roles/monitoring.viewer` on `<gke-project>`: the Pub/Sub scaler reads the backlog from Cloud Monitoring | this repo, `platform/keda.tf` |
+
+Pub/Sub dead-lettering uses the Pub/Sub service agent `service-<gke-project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`, not a pod identity: it is publisher on the DLQ topic and subscriber on the source subscription.
+
 ## Things to know
 
 - **The identity is namespace + service account name**, and the pool is shared by **all clusters of `<gke-project>`**. A pod running as `dev/tome-ms-language` in any cluster of that project gets the same access. Don't reuse a service account name for a workload that shouldn't have that access.

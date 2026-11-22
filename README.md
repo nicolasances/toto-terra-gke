@@ -65,12 +65,13 @@ principal://iam.googleapis.com/projects/<gke-project-number>/locations/global/wo
 
 ```
 cluster/      GCP platform: APIs, network, GKE cluster, DNS, certificates   (state: terraform/cluster)
-workloads/    Kubernetes objects: namespaces, Gateway, services              (state: terraform/state)
+platform/     Platform add-ons on the cluster: KEDA                          (state: terraform/platform)
+workloads/    Kubernetes objects: namespaces, Gateway, services, agents      (state: terraform/state)
 scripts/      tf-env.template.sh: the TF_VAR_* to set before running Terraform
 docs/         Architecture, Workload Identity, operations, diagrams
 ```
 
-The two folders are separate Terraform roots. Both store their state in the GCS bucket `toto-terra-gke-dr`. `workloads/` reads the outputs of `cluster/` through `terraform_remote_state`.
+The three folders are separate Terraform roots. `workloads/` needs the KEDA CRDs from `platform/` at plan time, so the order is `cluster/` → `platform/` → `workloads/`. Both store their state in the GCS bucket `toto-terra-gke-dr`. `workloads/` reads the outputs of `cluster/` through `terraform_remote_state`.
 
 ## Quick start
 
@@ -85,7 +86,8 @@ chmod 600 scripts/tf-env.dev.sh
 source scripts/tf-env.dev.sh
 
 cd cluster   && terraform init && terraform apply   # 1. platform
-cd ../workloads && terraform init && terraform apply   # 2. workloads (after toto-terra has granted access)
+cd ../platform && terraform init && terraform apply   # 2. add-ons (KEDA)
+cd ../workloads && terraform init && terraform apply   # 3. workloads (after toto-terra has granted access)
 ```
 
 The first setup needs a few steps outside this repo: the state bucket, IAM grants, NS records at the registrar, and `toto-terra`. The full order is in [docs/operations.md](docs/operations.md).
@@ -97,4 +99,5 @@ The `TF_VAR_<service>_image_tag` variables are only used when a Deployment is cr
 - [docs/architecture.md](docs/architecture.md): every component, and why it is there
 - [docs/workload-identity.md](docs/workload-identity.md): how pods get access to the toto projects
 - [docs/operations.md](docs/operations.md): first setup, deploying a new version through CI, rolling back, adding a service, troubleshooting
+- Agents: `agent-coder` runs as a Pub/Sub-driven KEDA ScaledJob in `agents-dev` / `agents-prod`, see [architecture](docs/architecture.md) and [operations](docs/operations.md)
 - [docs/diagrams/](docs/diagrams): draw.io diagrams (architecture, Workload Identity, Terraform layout)
