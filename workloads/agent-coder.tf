@@ -105,7 +105,8 @@ resource "google_pubsub_subscription" "agent-coder-sub" {
 
     dead_letter_policy {
         dead_letter_topic = google_pubsub_topic.agent-coder-dlq[each.key].id
-        max_delivery_attempts = 3
+        # 5 is the minimum Pub/Sub accepts (the issue asked for 3)
+        max_delivery_attempts = 5
     }
 }
 
