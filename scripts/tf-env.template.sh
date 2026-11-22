@@ -35,3 +35,6 @@ export TF_VAR_toto_react_supermarket_image_tag='{"dev":"<version>","prod":"<vers
 
 # Image tag (package.json version) of toto-reactjs-expenses used when its Deployments are created
 export TF_VAR_toto_reactjs_expenses_image_tag='{"dev":"<version>","prod":"<version>"}'
+
+# Image tag of agent-coder used when its ScaledJobs are created
+export TF_VAR_agent_coder_image_tag='{"dev":"<version>","prod":"<version>"}'
