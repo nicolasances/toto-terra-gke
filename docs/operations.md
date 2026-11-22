@@ -112,6 +112,23 @@ kubectl patch scaledjob agent-coder -n agents-dev --type=json \
 
 Only `agents-dev` is deployed by CI for now.
 
+**Pub/Sub grants (manual, once per environment, after applying `workloads/`).** The Terraform VM can't read or set IAM policies on topics and subscriptions, so these are made by hand. Without them, dead-lettering doesn't work and the pods can't pull. Run for `dev` and for `prod`:
+
+```bash
+GKE=<gke-project>; NUM=<gke-project-number>; ENV=dev
+
+# Dead-lettering: the Pub/Sub service agent publishes to the DLQ and acks on the source subscription
+gcloud pubsub topics add-iam-policy-binding agent-coder-tasks-$ENV-dlq --project $GKE \
+  --member="serviceAccount:service-$NUM@gcp-sa-pubsub.iam.gserviceaccount.com" --role="roles/pubsub.publisher"
+gcloud pubsub subscriptions add-iam-policy-binding agent-coder-tasks-$ENV-sub --project $GKE \
+  --member="serviceAccount:service-$NUM@gcp-sa-pubsub.iam.gserviceaccount.com" --role="roles/pubsub.subscriber"
+
+# The runner: subscriber on its own subscription only
+gcloud pubsub subscriptions add-iam-policy-binding agent-coder-tasks-$ENV-sub --project $GKE \
+  --member="principal://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/$GKE.svc.id.goog/subject/ns/agents-$ENV/sa/agent-coder" \
+  --role="roles/pubsub.subscriber"
+```
+
 **Publish a test message** (there are no publisher grants for pods: use your own account):
 
 ```bash
@@ -174,6 +191,7 @@ kubectl port-forward -n dev svc/tome-ms-language 8080:80
 | CI: 403 `container.clusters.get` when fetching credentials | Manual `roles/container.clusterViewer` grant missing for that `toto-cicd` SA (see first setup) |
 | `terraform apply` changes a Deployment's image | It shouldn't: the image is in `ignore_changes`. Check that the Deployment's `lifecycle` block still lists `container[0].image` |
 | `workloads/` plan: `no matches for kind "ScaledJob"` | KEDA CRDs missing: apply `platform/` first |
+| Pod can't pull (403 on the subscription), or failed messages never reach the DLQ | The manual Pub/Sub grants are missing (see "Agents") |
 | Messages pile up, no Job starts | Check `kubectl describe scaledjob agent-coder -n agents-<env>` and the `keda-operator` logs: usually the manual `roles/monitoring.viewer` grant to `keda/keda-operator` is missing, or the Cloud Monitoring API is not enabled |
 | `terraform apply` changes the ScaledJob's image | It shouldn't: check that `lifecycle.ignore_changes` in `workloads/agent-coder.tf` still lists the image |
 | 502 / no healthy upstream from the Gateway | Health check failing: check the HealthCheckPolicy and that `/health` answers on the container port |
