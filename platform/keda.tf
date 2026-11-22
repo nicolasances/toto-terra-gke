@@ -33,17 +33,11 @@ resource "helm_release" "keda" {
 }
 
 # ---------------------------------------------------------------
-# Workload Identity: the Pub/Sub scaler reads the subscription backlog
-# from Cloud Monitoring, as the keda-operator service account of the chart.
+# Workload Identity: the Pub/Sub scaler reads the subscription backlog from
+# Cloud Monitoring, as the keda-operator service account of the chart:
 # principal://.../subject/ns/keda/sa/keda-operator
+#
+# The role roles/monitoring.viewer on the GKE project is granted BY HAND, not here:
+# the Terraform VM has no IAM admin rights (403 "Policy update access denied").
+# See "platform/" in docs/operations.md.
 # ---------------------------------------------------------------
-resource "google_project_iam_member" "keda-operator-monitoring-viewer" {
-    project = var.gcp_pid
-    role = "roles/monitoring.viewer"
-    member = format(
-        "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/keda-operator",
-        data.terraform_remote_state.cluster.outputs.gke_project_number,
-        var.gcp_pid,
-        kubernetes_namespace_v1.keda.metadata[0].name,
-    )
-}

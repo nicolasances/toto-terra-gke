@@ -51,7 +51,7 @@ A service that needs more than secrets (Vertex AI, Cloud Storage, Pub/Sub, ...) 
 |---|---|---|
 | `agents-<env>/agent-coder` | `roles/pubsub.subscriber` on its own subscription `agent-coder-tasks-<env>-sub`, in `<gke-project>` | this repo, `workloads/agent-coder.tf` |
 | `agents-<env>/agent-coder` | secrets and the agents-data bucket in `<dev-project>` / `<prod-project>` | `toto-terra` ([issue 50](https://github.com/nicolasances/toto-terra/issues/50)) |
-| `keda/keda-operator` | `roles/monitoring.viewer` on `<gke-project>`: the Pub/Sub scaler reads the backlog from Cloud Monitoring | this repo, `platform/keda.tf` |
+| `keda/keda-operator` | `roles/monitoring.viewer` on `<gke-project>`: the Pub/Sub scaler reads the backlog from Cloud Monitoring | manual (the Terraform VM has no IAM admin rights), see [operations.md](operations.md) |
 
 Pub/Sub dead-lettering uses the Pub/Sub service agent `service-<gke-project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`, not a pod identity: it is publisher on the DLQ topic and subscriber on the source subscription.
 
