@@ -117,9 +117,10 @@ resource "google_pubsub_subscription" "agent-coder-sub" {
         max_delivery_attempts = 3
     }
 
+    # The subscriber grant on this subscription (below) can only be created after it, so it
+    # can't be a dependency here: dead-lettering works once both grants are in place
     depends_on = [
         google_pubsub_topic_iam_member.agent-coder-dlq-publisher,
-        google_pubsub_subscription_iam_member.agent-coder-dlq-source-subscriber,
     ]
 }
 
@@ -136,12 +137,9 @@ resource "google_pubsub_topic_iam_member" "agent-coder-dlq-publisher" {
 resource "google_pubsub_subscription_iam_member" "agent-coder-dlq-source-subscriber" {
     for_each = local.agent_environments
 
-    # Built from the name, not referenced, to avoid a cycle with the subscription's dead_letter_policy
-    subscription = format("agent-coder-tasks-%s-sub", each.key)
+    subscription = google_pubsub_subscription.agent-coder-sub[each.key].name
     role = "roles/pubsub.subscriber"
     member = local.pubsub_service_agent
-
-    depends_on = [google_pubsub_subscription.agent-coder-sub]
 }
 
 # The runner: subscriber on its own subscription only. No publisher grants (out of scope).
