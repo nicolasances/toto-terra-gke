@@ -68,7 +68,7 @@ Agents (today `agent-coder`: one GitHub issue in, one PR out, then exit) are bat
 |---|---|---|
 | KEDA (Helm chart, pinned) in namespace `keda` | `platform/` | Separate Terraform root, applied before `workloads/`: the KEDA CRDs must exist when `workloads/` is planned |
 | `roles/monitoring.viewer` on `<gke-project>` for `keda/keda-operator` | manual grant | The Pub/Sub scaler reads the backlog from Cloud Monitoring |
-| Topic `agent-coder-tasks-<env>`, pull subscription `...-sub`, DLQ topic `...-dlq` + subscription `...-dlq-sub` | `workloads/`, in `<gke-project>` | Exactly-once delivery, ack deadline 600s, 7 days retention, dead-letter after 3 delivery attempts |
+| Topic `agent-coder-tasks-<env>`, pull subscription `...-sub`, DLQ topic `...-dlq` + subscription `...-dlq-sub` | `workloads/`, in `<gke-project>` | Exactly-once delivery, ack deadline 600s, 7 days retention, dead-letter after 5 delivery attempts (the minimum Pub/Sub allows) |
 | ServiceAccount `agent-coder` in `agents-<env>` | `workloads/` | Subscriber on its own subscription only (manual grant); grants in the toto projects are in `toto-terra` |
 | TriggerAuthentication + ScaledJob `agent-coder` | `workloads/` | `gcp-pubsub` trigger, one pod per message |
 | Role + RoleBinding `ci-deployer` | `workloads/` | `get`/`patch` on `scaledjobs`, read on `jobs`/`pods`, for `toto-cicd@<env project>` |
@@ -77,7 +77,7 @@ Agents (today `agent-coder`: one GitHub issue in, one PR out, then exit) are bat
 
 **Flow.** A message `{"taskId": "<id>"}` is published on `agent-coder-tasks-<env>`. KEDA polls the backlog every 30 s and creates one Job per message, up to `agent_coder_max_replicas` at once (default 10). Each pod pulls one message, extends its lease while it works, acks or nacks, and exits. `task.json` stays in `gs://<toto project>-agents-data/coder/<taskId>/task.json`; only the id travels on the queue.
 
-**Retries** come from Pub/Sub, not Kubernetes (`backoffLimit: 0`): a nacked or expired message is redelivered, and after 3 attempts it goes to the DLQ subscription, where it is kept for inspection or replay. `activeDeadlineSeconds` (3h15m) is a hard backstop above the runner's own 3h timeout, and the pods are annotated `safe-to-evict: "false"` so autoscaling doesn't kill a run.
+**Retries** come from Pub/Sub, not Kubernetes (`backoffLimit: 0`): a nacked or expired message is redelivered, and after 5 attempts it goes to the DLQ subscription, where it is kept for inspection or replay. `activeDeadlineSeconds` (3h15m) is a hard backstop above the runner's own 3h timeout, and the pods are annotated `safe-to-evict: "false"` so autoscaling doesn't kill a run.
 
 **Scaling strategy.** `default`: it subtracts the running jobs from the backlog. The Pub/Sub backlog includes messages that are leased but not acked yet, so without that, every poll would start new jobs for messages already being worked on.
 

@@ -142,7 +142,7 @@ kubectl get scaledjob,jobs,pods -n agents-dev
 kubectl logs -n agents-dev job/<job-name>
 ```
 
-**Dead-lettered messages** (3 failed deliveries) are kept in the subscription `agent-coder-tasks-<env>-dlq-sub`:
+**Dead-lettered messages** (5 failed deliveries) are kept in the subscription `agent-coder-tasks-<env>-dlq-sub`:
 
 ```bash
 gcloud pubsub subscriptions pull agent-coder-tasks-dev-dlq-sub --project <gke-project> --limit 10      # inspect (no ack: they stay)
