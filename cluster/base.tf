@@ -37,5 +37,13 @@ resource "google_project_service" "certificatemanager-api" {
     service = "certificatemanager.googleapis.com"
     disable_on_destroy = false
 }
+resource "google_project_service" "pubsub-api" {
+    service = "pubsub.googleapis.com"
+    disable_on_destroy = false
+}
+resource "google_project_service" "monitoring-api" {
+    service = "monitoring.googleapis.com"
+    disable_on_destroy = false
+}
 
 data "google_project" "current" {}

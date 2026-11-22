@@ -60,6 +60,29 @@ CI authenticates with the existing `toto-cicd` Google service account of each to
 
 **Images** are pulled from the environment's Artifact Registry repository, which `toto-terra` makes publicly readable. That is why the nodes need no registry permission.
 
+## 4b. Agents: KEDA, Pub/Sub and `agents-<env>` (`platform/` + `workloads/agent-coder.tf`)
+
+Agents (today `agent-coder`: one GitHub issue in, one PR out, then exit) are batch jobs, not services. They run in their own namespaces, `agents-dev` and `agents-prod`, and are started from a queue.
+
+| Object | Where | Notes |
+|---|---|---|
+| KEDA (Helm chart, pinned) in namespace `keda` | `platform/` | Separate Terraform root, applied before `workloads/`: the KEDA CRDs must exist when `workloads/` is planned |
+| `roles/monitoring.viewer` on `<gke-project>` for `keda/keda-operator` | `platform/` | The Pub/Sub scaler reads the backlog from Cloud Monitoring |
+| Topic `agent-coder-tasks-<env>`, pull subscription `...-sub`, DLQ topic `...-dlq` + subscription `...-dlq-sub` | `workloads/`, in `<gke-project>` | Exactly-once delivery, ack deadline 600s, 7 days retention, dead-letter after 3 delivery attempts |
+| ServiceAccount `agent-coder` in `agents-<env>` | `workloads/` | Subscriber on its own subscription only; grants in the toto projects are in `toto-terra` |
+| TriggerAuthentication + ScaledJob `agent-coder` | `workloads/` | `gcp-pubsub` trigger, one pod per message |
+| Role + RoleBinding `ci-deployer` | `workloads/` | `get`/`patch` on `scaledjobs`, read on `jobs`/`pods`, for `toto-cicd@<env project>` |
+
+`agents-dev` maps to `<dev-project>` and `agents-prod` to `<prod-project>`, like `dev` and `prod`. Pub/Sub lives in `<gke-project>`, not in the toto projects.
+
+**Flow.** A message `{"taskId": "<id>"}` is published on `agent-coder-tasks-<env>`. KEDA polls the backlog every 30 s and creates one Job per message, up to `agent_coder_max_replicas` at once (default 10). Each pod pulls one message, extends its lease while it works, acks or nacks, and exits. `task.json` stays in `gs://<toto project>-agents-data/coder/<taskId>/task.json`; only the id travels on the queue.
+
+**Retries** come from Pub/Sub, not Kubernetes (`backoffLimit: 0`): a nacked or expired message is redelivered, and after 3 attempts it goes to the DLQ subscription, where it is kept for inspection or replay. `activeDeadlineSeconds` (3h15m) is a hard backstop above the runner's own 3h timeout, and the pods are annotated `safe-to-evict: "false"` so autoscaling doesn't kill a run.
+
+**Scaling strategy.** `default`: it subtracts the running jobs from the backlog. The Pub/Sub backlog includes messages that are leased but not acked yet, so without that, every poll would start new jobs for messages already being worked on.
+
+**Who owns what.** As for the services: Terraform owns the shape of the ScaledJob, **CI owns the image** (it patches the ScaledJob). The image is in `lifecycle.ignore_changes` of the `kubernetes_manifest`, so a `terraform apply` doesn't revert it. Only `agents-dev` is deployed by CI for now: the prod namespace and infrastructure are prepared, but nothing releases to it yet.
+
 ## 5. Secrets and configuration
 
 The `totoms` SDK reads its secrets from `projects/$GCP_PID/secrets/<name>` at startup, before it starts listening, with fixed names (`mongo-host`, `jwt-signing-key`, ...). Setting `GCP_PID` per namespace is what points `dev` to `<dev-project>` and `prod` to `<prod-project>`. The secrets never leave those projects, and nothing secret is stored in this repo or in Kubernetes.
