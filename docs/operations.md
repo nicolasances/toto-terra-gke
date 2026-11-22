@@ -49,7 +49,13 @@ gcloud projects add-iam-policy-binding <gke-project> \
 cd platform && terraform init && terraform apply
 ```
 
-This is a separate root because `workloads/` uses KEDA custom resources (`ScaledJob`, `TriggerAuthentication`) through `kubernetes_manifest`, which needs their CRDs to exist at **plan** time. On a fresh cluster, a single apply that installs KEDA and plans a `ScaledJob` fails. Always apply `platform/` before `workloads/`. If your VM can't create the IAM binding, grant `roles/monitoring.viewer` on `<gke-project>` by hand to `principal://iam.googleapis.com/projects/<gke-project-number>/locations/global/workloadIdentityPools/<gke-project>.svc.id.goog/subject/ns/keda/sa/keda-operator`.
+This is a separate root because `workloads/` uses KEDA custom resources (`ScaledJob`, `TriggerAuthentication`) through `kubernetes_manifest`, which needs their CRDs to exist at **plan** time. On a fresh cluster, a single apply that installs KEDA and plans a `ScaledJob` fails. Always apply `platform/` before `workloads/`. The VM has no IAM admin rights, so after the apply, grant by hand the role the Pub/Sub scaler needs to read the backlog from Cloud Monitoring (once):
+
+```bash
+gcloud projects add-iam-policy-binding <gke-project> \
+  --member="principal://iam.googleapis.com/projects/<gke-project-number>/locations/global/workloadIdentityPools/<gke-project>.svc.id.goog/subject/ns/keda/sa/keda-operator" \
+  --role="roles/monitoring.viewer" --condition=None
+```
 
 **5. `workloads/`**
 
@@ -168,6 +174,6 @@ kubectl port-forward -n dev svc/tome-ms-language 8080:80
 | CI: 403 `container.clusters.get` when fetching credentials | Manual `roles/container.clusterViewer` grant missing for that `toto-cicd` SA (see first setup) |
 | `terraform apply` changes a Deployment's image | It shouldn't: the image is in `ignore_changes`. Check that the Deployment's `lifecycle` block still lists `container[0].image` |
 | `workloads/` plan: `no matches for kind "ScaledJob"` | KEDA CRDs missing: apply `platform/` first |
-| Messages pile up, no Job starts | Check `kubectl describe scaledjob agent-coder -n agents-<env>` and the `keda-operator` logs: usually the `keda/keda-operator` grant `roles/monitoring.viewer` is missing, or the Cloud Monitoring API is not enabled |
+| Messages pile up, no Job starts | Check `kubectl describe scaledjob agent-coder -n agents-<env>` and the `keda-operator` logs: usually the manual `roles/monitoring.viewer` grant to `keda/keda-operator` is missing, or the Cloud Monitoring API is not enabled |
 | `terraform apply` changes the ScaledJob's image | It shouldn't: check that `lifecycle.ignore_changes` in `workloads/agent-coder.tf` still lists the image |
 | 502 / no healthy upstream from the Gateway | Health check failing: check the HealthCheckPolicy and that `/health` answers on the container port |
