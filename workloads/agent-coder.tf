@@ -139,6 +139,30 @@ resource "kubernetes_manifest" "agent-coder-trigger-auth" {
     }
 }
 
+# CI (GitHub Actions in agent-coder) owns the image after creation: it patches the ScaledJob
+# (field manager "kubectl-patch"). lifecycle.ignore_changes can't protect it on a kubernetes_manifest:
+# the provider still sends the whole manifest, so Terraform would revert the image (or conflict).
+# Instead, read the image that is live and send it back unchanged. When the ScaledJob doesn't
+# exist yet (first apply, new environment), the list is empty and var.agent_coder_image_tag is used.
+data "kubernetes_resources" "agent-coder-scaledjob-live" {
+    for_each = local.agent_environments
+
+    api_version = "keda.sh/v1alpha1"
+    kind = "ScaledJob"
+    # The namespace name (not the resource) so it is read at plan time
+    namespace = each.value.namespace
+    field_selector = "metadata.name=agent-coder"
+}
+
+locals {
+    agent_coder_image = {
+        for env, e in local.agent_environments : env => try(
+            data.kubernetes_resources.agent-coder-scaledjob-live[env].objects[0].spec.jobTargetRef.template.spec.containers[0].image,
+            format("europe-west1-docker.pkg.dev/%s/agent-coder/agent-coder:%s", e.toto_project, var.agent_coder_image_tag[env]),
+        )
+    }
+}
+
 resource "kubernetes_manifest" "agent-coder-scaledjob" {
     for_each = local.agent_environments
 
@@ -193,7 +217,8 @@ resource "kubernetes_manifest" "agent-coder-scaledjob" {
                         containers = [
                             {
                                 name = "agent-coder"
-                                image = format("europe-west1-docker.pkg.dev/%s/agent-coder/agent-coder:%s", each.value.toto_project, var.agent_coder_image_tag[each.key])
+                                # The live image (owned by CI), or the initial tag on creation: see the data source above
+                                image = local.agent_coder_image[each.key]
                                 env = [
                                     { name = "GCP_PID", value = each.value.toto_project },
                                     { name = "PUBSUB_PROJECT_ID", value = var.gcp_pid },
@@ -220,12 +245,11 @@ resource "kubernetes_manifest" "agent-coder-scaledjob" {
         }
     }
 
-    # CI (GitHub Actions in agent-coder) owns the image after creation: it patches the ScaledJob.
-    # Terraform only sets it when it creates the ScaledJob.
-    lifecycle {
-        ignore_changes = [
-            manifest.spec.jobTargetRef.template.spec.containers[0].image,
-        ]
+    # Other managers own fields Terraform also sets: "kubectl-patch" (CI) the image, and "keda" the
+    # CPU request/limit (rewritten when KEDA adds its finalizer). Terraform sends the same values
+    # (the image is read back from the cluster), so taking ownership back changes nothing live.
+    field_manager {
+        force_conflicts = true
     }
 
     depends_on = [kubernetes_manifest.agent-coder-trigger-auth]

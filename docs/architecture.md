@@ -81,7 +81,7 @@ Agents (today `agent-coder`: one GitHub issue in, one PR out, then exit) are bat
 
 **Scaling strategy.** `default`: it subtracts the running jobs from the backlog. The Pub/Sub backlog includes messages that are leased but not acked yet, so without that, every poll would start new jobs for messages already being worked on.
 
-**Who owns what.** As for the services: Terraform owns the shape of the ScaledJob, **CI owns the image** (it patches the ScaledJob). The image is in `lifecycle.ignore_changes` of the `kubernetes_manifest`, so a `terraform apply` doesn't revert it. Only `agents-dev` is deployed by CI for now: the prod namespace and infrastructure are prepared, but nothing releases to it yet.
+**Who owns what.** As for the services: Terraform owns the shape of the ScaledJob, **CI owns the image** (it patches the ScaledJob). `lifecycle.ignore_changes` doesn't work for that on a `kubernetes_manifest` (the provider still sends the whole manifest), so Terraform reads the live image back from the cluster (`data.kubernetes_resources`) and sends it unchanged, with `force_conflicts` to take field ownership back from CI (`kubectl-patch`) and KEDA. `var.agent_coder_image_tag` is only used when the ScaledJob doesn't exist yet. Only `agents-dev` is deployed by CI for now: the prod namespace and infrastructure are prepared, but nothing releases to it yet.
 
 ## 5. Secrets and configuration
 
