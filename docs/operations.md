@@ -193,5 +193,6 @@ kubectl port-forward -n dev svc/tome-ms-language 8080:80
 | `workloads/` plan: `no matches for kind "ScaledJob"` | KEDA CRDs missing: apply `platform/` first |
 | Pod can't pull (403 on the subscription), or failed messages never reach the DLQ | The manual Pub/Sub grants are missing (see "Agents") |
 | Messages pile up, no Job starts | Check `kubectl describe scaledjob agent-coder -n agents-<env>` and the `keda-operator` logs: usually the manual `roles/monitoring.viewer` grant to `keda/keda-operator` is missing, or the Cloud Monitoring API is not enabled |
-| `terraform apply` changes the ScaledJob's image | It shouldn't: check that `lifecycle.ignore_changes` in `workloads/agent-coder.tf` still lists the image |
+| `terraform apply` changes the ScaledJob's image | It shouldn't: the image is read back from the cluster (`data.kubernetes_resources.agent-coder-scaledjob-live`). A diff on `manifest` only (same `object`) after a CI deploy is expected and harmless |
+| `workloads/` apply: `field manager conflict` on the ScaledJob | `field_manager.force_conflicts` must stay `true` in `workloads/agent-coder.tf`: CI (`kubectl-patch`) and KEDA own some of its fields |
 | 502 / no healthy upstream from the Gateway | Health check failing: check the HealthCheckPolicy and that `/health` answers on the container port |
