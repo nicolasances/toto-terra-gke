@@ -38,3 +38,7 @@ export TF_VAR_toto_reactjs_expenses_image_tag='{"dev":"<version>","prod":"<versi
 
 # Image tag of agent-coder used when its ScaledJobs are created
 export TF_VAR_agent_coder_image_tag='{"dev":"<version>","prod":"<version>"}'
+
+# Image tag of ape-tasks used when its Deployments are created
+# (dev: <version>-<sha> built from a feature/** branch, prod: <version> built from main)
+export TF_VAR_ape_tasks_image_tag='{"dev":"<version>-<sha>","prod":"<version>"}'
